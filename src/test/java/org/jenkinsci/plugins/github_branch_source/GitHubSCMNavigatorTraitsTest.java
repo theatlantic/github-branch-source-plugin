@@ -1638,7 +1638,7 @@ public class GitHubSCMNavigatorTraitsTest {
     @Test
     public void given__instance__when__setTraits__then__traitsSet() {
         GitHubSCMNavigator instance = new GitHubSCMNavigator("test");
-        instance.setTraits(Arrays.asList(new BranchDiscoveryTrait(1),
+        instance.setTraits(Arrays.asList(new BranchDiscoveryTrait(1, ".*"),
                 new SSHCheckoutTrait(null)));
         assertThat(instance.getTraits(),
                 containsInAnyOrder(

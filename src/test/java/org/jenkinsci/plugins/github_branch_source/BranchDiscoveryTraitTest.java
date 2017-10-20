@@ -36,7 +36,8 @@ public class BranchDiscoveryTraitTest {
         assertThat(ctx.wantBranches(), is(true));
         assertThat(ctx.wantPRs(), is(false));
         assertThat(ctx.prefilters(), is(Collections.<SCMHeadPrefilter>emptyList()));
-        assertThat(ctx.filters(), is(Collections.<SCMHeadFilter>emptyList()));
+        assertThat(ctx.filters(),
+                contains(instanceOf(BranchDiscoveryTrait.RegexSCMHeadFilter.class)));
         assertThat(ctx.authorities(), hasItem(
                 instanceOf(BranchDiscoveryTrait.BranchSCMHeadAuthority.class)
         ));

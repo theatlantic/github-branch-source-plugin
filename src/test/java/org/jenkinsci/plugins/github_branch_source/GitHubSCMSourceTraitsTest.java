@@ -79,7 +79,7 @@ public class GitHubSCMSourceTraitsTest {
                         + "repoOwner=repo-owner,"
                         + "repository=repo,"
                         + "traits=["
-                        + "@gitHubBranchDiscovery$org.jenkinsci.plugins.github_branch_source.BranchDiscoveryTrait(strategyId=1), "
+                        + "@gitHubBranchDiscovery$org.jenkinsci.plugins.github_branch_source.BranchDiscoveryTrait(regex=.*?,strategyId=1), "
                         + "@gitHubPullRequestDiscovery$OriginPullRequestDiscoveryTrait(strategyId=1), "
                         + "@gitHubForkDiscovery$ForkPullRequestDiscoveryTrait("
                         + "strategyId=2,"
@@ -540,7 +540,7 @@ public class GitHubSCMSourceTraitsTest {
     @Test
     public void given__instance__when__setTraits__then__traitsSet() {
         GitHubSCMSource instance = new GitHubSCMSource("testing", "test-repo");
-        instance.setTraits(Arrays.asList(new BranchDiscoveryTrait(1),
+        instance.setTraits(Arrays.asList(new BranchDiscoveryTrait(1, ".*"),
                 new SSHCheckoutTrait("value")));
         assertThat(instance.getTraits(),
                 containsInAnyOrder(

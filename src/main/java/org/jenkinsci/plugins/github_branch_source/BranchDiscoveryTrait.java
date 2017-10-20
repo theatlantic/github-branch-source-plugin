@@ -23,9 +23,12 @@
  */
 package org.jenkinsci.plugins.github_branch_source;
 
+import edu.umd.cs.findbugs.annotations.CheckForNull;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.Extension;
 import hudson.util.ListBoxModel;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import jenkins.scm.api.SCMHead;
 import jenkins.scm.api.SCMHeadCategory;
 import jenkins.scm.api.SCMHeadOrigin;
@@ -40,6 +43,7 @@ import jenkins.scm.api.trait.SCMSourceTrait;
 import jenkins.scm.api.trait.SCMSourceTraitDescriptor;
 import jenkins.scm.impl.trait.Discovery;
 import org.jenkinsci.Symbol;
+import org.apache.commons.lang.StringUtils;
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
 import org.kohsuke.github.GHPullRequest;
@@ -58,13 +62,20 @@ public class BranchDiscoveryTrait extends SCMSourceTrait {
     private final int strategyId;
 
     /**
+     * Optional regex to filter branches.
+     */
+    private String regex;
+
+    /**
      * Constructor for stapler.
      *
      * @param strategyId the strategy id.
+     * @param regex      the regex.
      */
     @DataBoundConstructor
-    public BranchDiscoveryTrait(int strategyId) {
+    public BranchDiscoveryTrait(int strategyId, String regex) {
         this.strategyId = strategyId;
+        this.regex = StringUtils.defaultIfBlank(regex, ".*");
     }
 
     /**
@@ -75,6 +86,7 @@ public class BranchDiscoveryTrait extends SCMSourceTrait {
      */
     public BranchDiscoveryTrait(boolean buildBranch, boolean buildBranchWithPr) {
         this.strategyId = (buildBranch ? 1 : 0) + (buildBranchWithPr ? 2 : 0);
+        this.regex = ".*?";
     }
 
     /**
@@ -84,6 +96,16 @@ public class BranchDiscoveryTrait extends SCMSourceTrait {
      */
     public int getStrategyId() {
         return strategyId;
+    }
+
+
+    /**
+     * Returns the regex.
+     *
+     * @return the regex.
+     */
+    public String getRegex() {
+        return regex;
     }
 
     /**
@@ -117,17 +139,17 @@ public class BranchDiscoveryTrait extends SCMSourceTrait {
         switch (strategyId) {
             case 1:
                 ctx.wantOriginPRs(true);
-                ctx.withFilter(new ExcludeOriginPRBranchesSCMHeadFilter());
+                ctx.withFilter(new ExcludeOriginPRBranchesSCMHeadFilter(this.regex));
                 break;
             case 2:
                 ctx.wantOriginPRs(true);
-                ctx.withFilter(new OnlyOriginPRBranchesSCMHeadFilter());
+                ctx.withFilter(new OnlyOriginPRBranchesSCMHeadFilter(this.regex));
                 break;
             case 3:
             default:
                 // we don't care if it is a PR or not, we're taking them all, no need to ask for PRs and no need
                 // to filter
-                break;
+                ctx.withFilter(new RegexSCMHeadFilter(this.regex));
         }
     }
 
@@ -224,10 +246,65 @@ public class BranchDiscoveryTrait extends SCMSourceTrait {
         }
     }
 
+    public static class RegexSCMHeadFilter extends SCMHeadFilter {
+        /**
+         * Optional regex to filter branches.
+         */
+        private String regex;
+
+        /**
+         * The compiled {@link Pattern}.
+         */
+        @CheckForNull
+        private transient Pattern pattern;
+
+        public RegexSCMHeadFilter(String regex) {
+            pattern = Pattern.compile(regex);
+            this.regex = regex;
+        }
+
+        /**
+         * Gets the regular expression.
+         *
+         * @return the regular expression.
+         */
+        @NonNull
+        public String getRegex() {
+            return regex;
+        }
+
+        /**
+         * Gets the compiled {@link Pattern}.
+         *
+         * @return the compiled {@link Pattern}.
+         */
+        @NonNull
+        public Pattern getPattern() {
+            if (pattern == null) {
+                // idempotent
+                pattern = Pattern.compile(regex);
+            }
+            return pattern;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean isExcluded(@NonNull SCMSourceRequest request, @NonNull SCMHead head) {
+            return !getPattern().matcher(head.getName()).matches();
+        }
+    }
+
     /**
      * Filter that excludes branches that are also filed as a pull request.
      */
-    public static class ExcludeOriginPRBranchesSCMHeadFilter extends SCMHeadFilter {
+    public static class ExcludeOriginPRBranchesSCMHeadFilter extends RegexSCMHeadFilter {
+
+        public ExcludeOriginPRBranchesSCMHeadFilter(String regex) {
+            super(regex);
+        }
+
         /**
          * {@inheritDoc}
          */
@@ -243,14 +320,19 @@ public class BranchDiscoveryTrait extends SCMSourceTrait {
                     }
                 }
             }
-            return false;
+            return super.isExcluded(request, head);
         }
     }
 
     /**
      * Filter that excludes branches that are not also filed as a pull request.
      */
-    public static class OnlyOriginPRBranchesSCMHeadFilter extends SCMHeadFilter {
+    public static class OnlyOriginPRBranchesSCMHeadFilter extends RegexSCMHeadFilter {
+
+        public OnlyOriginPRBranchesSCMHeadFilter(String regex) {
+            super(regex);
+        }
+
         /**
          * {@inheritDoc}
          */
@@ -267,7 +349,7 @@ public class BranchDiscoveryTrait extends SCMSourceTrait {
                 }
                 return true;
             }
-            return false;
+            return super.isExcluded(request, head);
         }
     }
 }
